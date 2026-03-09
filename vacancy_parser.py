@@ -1,17 +1,15 @@
 import requests
 from bs4 import BeautifulSoup
 
-def parse_vacancy(url):
+def parse_vacancy(url_or_text: str) -> str:
 
-    try:
+    if url_or_text.startswith("http"):
+        try:
+            r = requests.get(url_or_text, timeout=10)
+            soup = BeautifulSoup(r.text, "html.parser")
+            text = soup.get_text()
+            return text[:4000]
+        except:
+            return url_or_text
 
-        r = requests.get(url, timeout=10)
-
-        soup = BeautifulSoup(r.text, "html.parser")
-
-        text = soup.get_text()
-
-        return text[:4000]
-
-    except:
-        return url
+    return url_or_text
