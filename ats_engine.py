@@ -3,25 +3,28 @@ from openai import OpenAI
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
+
 def analyze(resume, vacancy):
 
-    prompt = f"""
-Ты профессиональная ATS система HR.
+    try:
 
+        prompt = f"""
 Проанализируй резюме и вакансию.
 
-Ответь на русском языке в формате:
+Ответь на русском.
 
-ATS ОЦЕНКА: (0-100)
+Формат:
+
+ATS ОЦЕНКА (0-100)
 
 ПОДХОДЯЩИЕ НАВЫКИ
-- ...
+...
 
-ОТСУТСТВУЮЩИЕ НАВЫКИ
-- ...
+ЧЕГО НЕ ХВАТАЕТ
+...
 
-СОВЕТЫ КАК УЛУЧШИТЬ РЕЗЮМЕ
-- ...
+СОВЕТЫ
+...
 
 Резюме:
 {resume}
@@ -30,9 +33,13 @@ ATS ОЦЕНКА: (0-100)
 {vacancy}
 """
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[{"role": "user", "content": prompt}]
-    )
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[{"role": "user", "content": prompt}]
+        )
 
-    return response.choices[0].message.content
+        return response.choices[0].message.content
+
+    except Exception as e:
+
+        return f"Ошибка AI анализа:\n{str(e)}"
