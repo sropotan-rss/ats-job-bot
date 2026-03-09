@@ -3,39 +3,36 @@ from openai import OpenAI
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-
 def analyze(resume, vacancy):
 
     prompt = f"""
+Ты профессиональная ATS система HR.
 
-You are an ATS system.
+Проанализируй резюме и вакансию.
 
-Resume:
+Ответь на русском языке в формате:
+
+ATS ОЦЕНКА: (0-100)
+
+ПОДХОДЯЩИЕ НАВЫКИ
+- ...
+
+ОТСУТСТВУЮЩИЕ НАВЫКИ
+- ...
+
+СОВЕТЫ КАК УЛУЧШИТЬ РЕЗЮМЕ
+- ...
+
+Резюме:
 {resume}
 
-Vacancy:
+Вакансия:
 {vacancy}
-
-Return:
-
-1 ATS SCORE (0-100)
-
-2 Missing keywords
-
-3 What to ADD to resume (do not rewrite resume)
-
-4 Short cover letter
-
 """
 
     response = client.chat.completions.create(
-
         model="gpt-4o-mini",
-
-        messages=[
-            {"role": "user", "content": prompt}
-        ]
-
+        messages=[{"role": "user", "content": prompt}]
     )
 
     return response.choices[0].message.content
