@@ -1,5 +1,6 @@
 python-telegram-bot==20.7
-openai
-python-dotenv
+openai==1.12.0
 requests
 beautifulsoup4
+pypdf
+python-dotenv
