@@ -15,11 +15,9 @@ resume_text = ""
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
-
         "Send PDF resume\n"
         "Send hh.ru vacancy link\n"
         "Command: /jobs Product Manager"
-
     )
 
 
@@ -48,24 +46,25 @@ async def handle_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     url = update.message.text
 
     if "hh.ru" not in url:
-
         await update.message.reply_text("Send hh.ru vacancy link")
-
         return
 
     if not resume_text:
-
-        with open("resume.txt", "r", encoding="utf-8") as f:
-
-            resume_text = f.read()
+        try:
+            with open("resume.txt", "r", encoding="utf-8") as f:
+                resume_text = f.read()
+        except:
+            await update.message.reply_text("Upload resume PDF first")
+            return
 
     await update.message.reply_text("Analyzing vacancy...")
 
-    vacancy = parse_hh(url)
-
-    result = analyze(resume_text, vacancy)
-
-    await update.message.reply_text(result[:4000])
+    try:
+        vacancy = parse_hh(url)
+        result = analyze(resume_text, vacancy)
+        await update.message.reply_text(result[:4000])
+    except Exception as e:
+        await update.message.reply_text(f"Error: {e}")
 
 
 async def jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -73,9 +72,7 @@ async def jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = " ".join(context.args)
 
     if not query:
-
         await update.message.reply_text("Example: /jobs Product Manager")
-
         return
 
     links = search_jobs(query)
@@ -83,7 +80,6 @@ async def jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = "Top vacancies:\n\n"
 
     for l in links:
-
         text += l + "\n"
 
     await update.message.reply_text(text)
@@ -94,7 +90,6 @@ def main():
     token = os.getenv("BOT_TOKEN")
 
     if not token:
-
         raise ValueError("BOT_TOKEN not set")
 
     app = ApplicationBuilder().token(token).build()
@@ -107,9 +102,8 @@ def main():
 
     print("BOT STARTED")
 
-    app.run_polling()
+    app.run_polling(close_loop=False)
 
 
 if __name__ == "__main__":
-
     main()
