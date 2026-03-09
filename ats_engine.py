@@ -1,17 +1,23 @@
 import os
-from openai import OpenAI
+import requests
 
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+API_KEY = os.getenv("HF_API_KEY")
+
+API_URL = "https://api-inference.huggingface.co/models/mistralai/Mixtral-8x7B-Instruct-v0.1"
+
+headers = {
+    "Authorization": f"Bearer {API_KEY}"
+}
 
 
 def analyze(resume, vacancy):
 
-    try:
+    prompt = f"""
+Ты HR эксперт.
 
-        prompt = f"""
 Проанализируй резюме и вакансию.
 
-Ответь на русском.
+Ответь на русском языке.
 
 Формат:
 
@@ -33,13 +39,12 @@ ATS ОЦЕНКА (0-100)
 {vacancy}
 """
 
-        response = client.chat.completions.create(
-            model="gpt-4o-mini"
-max_tokens=500
-        )
+    response = requests.post(
+        API_URL,
+        headers=headers,
+        json={"inputs": prompt}
+    )
 
-        return response.choices[0].message.content
+    result = response.json()
 
-    except Exception as e:
-
-        return f"Ошибка AI анализа:\n{str(e)}"
+    return str(result)
