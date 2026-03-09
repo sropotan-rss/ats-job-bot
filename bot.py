@@ -1,11 +1,19 @@
-```python
 import logging
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
+
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes
+from telegram.ext import Application, CommandHandler, MessageHandler, ContextTypes, filters
+
 from ai_engine import analyze_resume_vacancy
 from vacancy_parser import parse_vacancy
 
-TOKEN = "YOUR_TELEGRAM_BOT_TOKEN"
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+TOKEN = os.getenv("TELEGRAM_TOKEN")
 
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -14,59 +22,77 @@ logging.basicConfig(
 
 resume_storage = {}
 
-# /start
+executor = ThreadPoolExecutor(max_workers=2)
+
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
     await update.message.reply_text(
-        "Привет! 👋\n\n"
-        "Отправь своё резюме текстом.\n"
-        "После этого отправь вакансию — я скажу, насколько ты подходишь."
+        "👋 Привет!\n\n"
+        "1️⃣ Отправь текст или PDF резюме\n"
+        "2️⃣ Затем отправь вакансию\n\n"
+        "Я сделаю ATS анализ."
     )
 
-# обработка сообщений
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
+
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     user = update.message.from_user.id
     text = update.message.text
 
-    # если резюме ещё нет — сохраняем
     if user not in resume_storage:
-        resume_storage[user] = text[:3000]  # обрезка длинного текста
+
+        resume_storage[user] = text[:1500]
+
         await update.message.reply_text(
-            "✅ Резюме сохранено.\n\nТеперь отправь вакансию."
+            "✅ Резюме сохранено\n\nТеперь отправь вакансию."
         )
+
         return
 
-    # если резюме уже есть — считаем это вакансией
-    vacancy = parse_vacancy(text)[:3000]
+    vacancy = parse_vacancy(text)[:1500]
     resume = resume_storage[user]
 
-    msg = await update.message.reply_text("🔎 Анализирую...")
+    msg = await update.message.reply_text("⚡ Анализирую...")
+
+    loop = asyncio.get_event_loop()
 
     try:
-        result = analyze_resume_vacancy(resume, vacancy)
+
+        result = await loop.run_in_executor(
+            executor,
+            analyze_resume_vacancy,
+            resume,
+            vacancy
+        )
 
         await msg.edit_text(
             "📊 Результат анализа:\n\n" + result
         )
 
     except Exception as e:
+
         logging.error(e)
+
         await msg.edit_text(
             "❌ Ошибка анализа. Попробуй ещё раз."
         )
 
 
 def main():
+
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
-    print("Bot started...")
+    app.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text)
+    )
+
+    print("Bot started")
 
     app.run_polling()
 
 
 if __name__ == "__main__":
     main()
-```
