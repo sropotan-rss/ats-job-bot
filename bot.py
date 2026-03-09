@@ -17,18 +17,10 @@ GROQ_API_KEY = "YOUR_GROQ_API_KEY"
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
 
-# =========================
-# ЛОГИ
-# =========================
-
 logging.basicConfig(level=logging.INFO)
 
 bot = Bot(token=TELEGRAM_TOKEN)
 dp = Dispatcher(bot)
-
-# =========================
-# ХРАНЕНИЕ
-# =========================
 
 user_state = {}
 
@@ -37,9 +29,14 @@ user_state = {}
 # =========================
 
 def main_menu():
+
     kb = ReplyKeyboardMarkup(resize_keyboard=True)
-    kb.add("📄 Анализ резюме")
-    kb.add("ℹ️ Помощь")
+
+    kb.add("📊 Анализ резюме")
+    kb.add("✨ Улучшить резюме")
+    kb.add("✉️ Cover letter")
+    kb.add("💰 Оценка зарплаты")
+
     return kb
 
 
@@ -51,43 +48,13 @@ def main_menu():
 async def start(message: types.Message):
 
     await message.answer(
-        "🤖 AI HR бот\n\n"
-        "Я могу проанализировать резюме относительно вакансии.",
+        "🤖 ULTRA AI HR BOT\n\n"
+        "Я могу:\n"
+        "• анализировать резюме\n"
+        "• улучшать резюме\n"
+        "• писать cover letter\n"
+        "• оценивать зарплату\n",
         reply_markup=main_menu()
-    )
-
-
-# =========================
-# ПОМОЩЬ
-# =========================
-
-@dp.message_handler(lambda m: m.text == "ℹ️ Помощь")
-async def help_cmd(message: types.Message):
-
-    await message.answer(
-        "📌 Как пользоваться:\n\n"
-        "1️⃣ Нажмите *Анализ резюме*\n"
-        "2️⃣ Отправьте резюме\n"
-        "3️⃣ Отправьте вакансию\n\n"
-        "Поддерживаются:\n"
-        "TXT\nPDF\nDOCX",
-        parse_mode="Markdown"
-    )
-
-
-# =========================
-# НАЧАТЬ АНАЛИЗ
-# =========================
-
-@dp.message_handler(lambda m: m.text == "📄 Анализ резюме")
-async def start_analysis(message: types.Message):
-
-    user_state[message.from_user.id] = {"step": "resume"}
-
-    await message.answer(
-        "📄 Отправьте резюме\n\n"
-        "Можно:\n"
-        "TXT\nPDF\nDOCX"
     )
 
 
@@ -100,6 +67,7 @@ def read_pdf(path):
     text = ""
 
     with pdfplumber.open(path) as pdf:
+
         for page in pdf.pages:
             text += page.extract_text() + "\n"
 
@@ -120,75 +88,102 @@ def read_docx(path):
 
 
 # =========================
-# ПОЛУЧЕНИЕ РЕЗЮМЕ
+# ПОЛУЧЕНИЕ ФАЙЛА
 # =========================
 
-@dp.message_handler(content_types=["document", "text"])
-async def receive_resume(message: types.Message):
+async def extract_text(message):
 
     uid = message.from_user.id
-
-    if uid not in user_state:
-        return
-
-    if user_state[uid]["step"] != "resume":
-        return
 
     if message.document:
 
         file = await bot.get_file(message.document.file_id)
-        path = f"resume_{uid}"
+
+        path = f"file_{uid}"
 
         await message.document.download(destination_file=path)
 
         if message.document.file_name.endswith(".pdf"):
-            text = read_pdf(path)
+            return read_pdf(path)
 
         elif message.document.file_name.endswith(".docx"):
-            text = read_docx(path)
+            return read_docx(path)
 
-        else:
-            await message.answer("❌ Поддерживаются только PDF или DOCX")
-            return
-
-    else:
-
-        text = message.text
-
-    user_state[uid]["resume"] = text
-    user_state[uid]["step"] = "vacancy"
-
-    await message.answer("📋 Теперь отправьте текст вакансии")
+    return message.text
 
 
 # =========================
-# ПОЛУЧЕНИЕ ВАКАНСИИ
+# АНАЛИЗ
 # =========================
 
-@dp.message_handler()
-async def receive_vacancy(message: types.Message):
+@dp.message_handler(lambda m: m.text == "📊 Анализ резюме")
+async def analyze_start(message: types.Message):
+
+    user_state[message.from_user.id] = {"mode": "analysis", "step": "resume"}
+
+    await message.answer("📄 Отправьте резюме")
+
+
+# =========================
+# УЛУЧШЕНИЕ
+# =========================
+
+@dp.message_handler(lambda m: m.text == "✨ Улучшить резюме")
+async def improve_resume(message: types.Message):
+
+    user_state[message.from_user.id] = {"mode": "improve"}
+
+    await message.answer("📄 Отправьте резюме")
+
+
+# =========================
+# COVER LETTER
+# =========================
+
+@dp.message_handler(lambda m: m.text == "✉️ Cover letter")
+async def cover_letter(message: types.Message):
+
+    user_state[message.from_user.id] = {"mode": "cover"}
+
+    await message.answer("📄 Отправьте резюме")
+
+
+# =========================
+# ЗАРПЛАТА
+# =========================
+
+@dp.message_handler(lambda m: m.text == "💰 Оценка зарплаты")
+async def salary(message: types.Message):
+
+    user_state[message.from_user.id] = {"mode": "salary"}
+
+    await message.answer("📄 Отправьте резюме")
+
+
+# =========================
+# ОБРАБОТКА
+# =========================
+
+@dp.message_handler(content_types=["text", "document"])
+async def process(message: types.Message):
 
     uid = message.from_user.id
 
     if uid not in user_state:
         return
 
-    if user_state[uid]["step"] != "vacancy":
-        return
+    text = await extract_text(message)
 
-    user_state[uid]["vacancy"] = message.text
+    mode = user_state[uid]["mode"]
 
-    resume = user_state[uid]["resume"]
-    vacancy = user_state[uid]["vacancy"]
-
-    msg = await message.answer("🔍 Анализирую резюме... 10%")
+    msg = await message.answer("🔍 AI анализирует... 10%")
 
     await asyncio.sleep(1)
-    await msg.edit_text("🔍 Анализирую навыки... 40%")
+    await msg.edit_text("🧠 Обработка навыков... 40%")
 
-    result = await analyze_ai(resume, vacancy)
+    result = await ai_request(text, mode)
 
-    await msg.edit_text("🔍 Формирую отчёт... 90%")
+    await msg.edit_text("📊 Формирую отчёт... 90%")
 
     await asyncio.sleep(1)
 
@@ -201,31 +196,48 @@ async def receive_vacancy(message: types.Message):
 # AI
 # =========================
 
-async def analyze_ai(resume, vacancy):
+async def ai_request(text, mode):
 
-    prompt = f"""
+    prompts = {
+
+        "analysis": f"""
 Ты HR специалист.
 
-Проанализируй резюме относительно вакансии.
+Проанализируй резюме.
 
-Резюме:
-{resume}
+{text}
 
-Вакансия:
-{vacancy}
+Ответь:
 
-Ответь структурировано:
-
-Процент совпадения: %
-
-Подходит ли кандидат
-
+Процент совпадения
+ATS score
 Сильные стороны
-
 Недостающие навыки
+Шанс получить интервью
+""",
 
-Советы кандидату
+        "improve": f"""
+Улучши резюме:
+
+{text}
+
+Сделай его более сильным для работодателя.
+""",
+
+        "cover": f"""
+Напиши сильное cover letter на основе резюме:
+
+{text}
+""",
+
+        "salary": f"""
+Оцени возможную зарплату кандидата на основе резюме:
+
+{text}
+
+Ответь диапазоном.
 """
+    }
 
     headers = {
         "Authorization": f"Bearer {GROQ_API_KEY}",
@@ -235,7 +247,7 @@ async def analyze_ai(resume, vacancy):
     json_data = {
         "model": "llama3-70b-8192",
         "messages": [
-            {"role": "user", "content": prompt}
+            {"role": "user", "content": prompts[mode]}
         ]
     }
 
@@ -253,16 +265,13 @@ async def analyze_ai(resume, vacancy):
 
                 data = await resp.json()
 
-                if "choices" not in data:
-                    return "⚠️ AI не ответил"
-
                 return data["choices"][0]["message"]["content"]
 
     except Exception as e:
 
         print(e)
 
-        return "❌ Ошибка AI сервиса"
+        return "❌ Ошибка AI"
 
 
 # =========================
