@@ -6,19 +6,28 @@ load_dotenv()
 
 client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
+MODEL = "llama3-8b-8192"
+
+
 def analyze(resume: str, vacancy: str) -> str:
+
+    # Ограничиваем текст чтобы ускорить AI
+    resume = resume[:2000]
+    vacancy = vacancy[:2000]
 
     prompt = f"""
 Ты HR эксперт.
-Проанализируй резюме и вакансию.
-Ответь в формате:
+
+Сравни резюме и вакансию.
+
+Ответь коротко:
 
 ATS ОЦЕНКА (0-100)
+
 СИЛЬНЫЕ СТОРОНЫ
 - ...
+
 ЧЕГО НЕ ХВАТАЕТ
-- ...
-СОВЕТЫ
 - ...
 
 Резюме:
@@ -29,9 +38,10 @@ ATS ОЦЕНКА (0-100)
 """
 
     completion = client.chat.completions.create(
-        model="llama3-70b-8192",
+        model=MODEL,
         messages=[{"role": "user", "content": prompt}],
-        temperature=0.2
+        temperature=0.2,
+        max_tokens=400
     )
 
     return completion.choices[0].message.content
