@@ -3,10 +3,11 @@ import requests
 
 API_KEY = os.getenv("HF_API_KEY")
 
-API_URL = "https://api-inference.huggingface.co/models/mistralai/Mixtral-8x7B-Instruct-v0.1"
+API_URL = "https://router.huggingface.co/hf-inference/models/mistralai/Mixtral-8x7B-Instruct-v0.1"
 
 headers = {
-    "Authorization": f"Bearer {API_KEY}"
+    "Authorization": f"Bearer {API_KEY}",
+    "Content-Type": "application/json"
 }
 
 
@@ -19,18 +20,18 @@ def analyze(resume, vacancy):
 
 Ответь на русском языке.
 
-Формат:
+Формат ответа:
 
 ATS ОЦЕНКА (0-100)
 
 ПОДХОДЯЩИЕ НАВЫКИ
-...
+- ...
 
 ЧЕГО НЕ ХВАТАЕТ
-...
+- ...
 
 СОВЕТЫ
-...
+- ...
 
 Резюме:
 {resume}
@@ -39,12 +40,15 @@ ATS ОЦЕНКА (0-100)
 {vacancy}
 """
 
-    response = requests.post(
-        API_URL,
-        headers=headers,
-        json={"inputs": prompt}
-    )
+    data = {
+        "inputs": prompt
+    }
+
+    response = requests.post(API_URL, headers=headers, json=data)
 
     result = response.json()
+
+    if isinstance(result, list):
+        return result[0]["generated_text"]
 
     return str(result)
