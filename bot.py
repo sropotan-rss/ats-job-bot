@@ -1,7 +1,9 @@
 import os
-import logging
-
-from telegram import Update
+from dotenv import load_dotenv
+from telegram import (
+    Update,
+    ReplyKeyboardMarkup
+)
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
@@ -10,144 +12,122 @@ from telegram.ext import (
     filters
 )
 
-from parser import parse_hh
-from ats_engine import analyze
-from resume_reader import read_pdf
-from hh_search import search_jobs
+from pdf_parser import extract_text
+from ai_engine import analyze
 
+load_dotenv()
 
-logging.basicConfig(level=logging.INFO)
+TOKEN = os.getenv("TELEGRAM_TOKEN")
 
-resume_text = ""
+resume_storage = {}
+
+menu_keyboard = ReplyKeyboardMarkup(
+    [
+        ["📄 Отправить резюме"],
+        ["💼 Анализ вакансии"],
+        ["ℹ️ Помощь"]
+    ],
+    resize_keyboard=True
+)
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    text = """
-🤖 AI Бот анализа резюме
+    await update.message.reply_text(
+        "Привет 👋\n\nЯ бот для анализа резюме.\n\nВыбери действие:",
+        reply_markup=menu_keyboard
+    )
 
-Что я умею:
 
-1️⃣ Отправь PDF резюме  
-2️⃣ Отправь ссылку на вакансию hh.ru  
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-Я покажу:
+    await update.message.reply_text(
+        "Инструкция:\n\n"
+        "1️⃣ Нажми 'Отправить резюме'\n"
+        "2️⃣ Загрузи PDF файл\n"
+        "3️⃣ Отправь текст вакансии\n\n"
+        "Бот рассчитает ATS совместимость."
+    )
 
-📊 ATS оценку  
-✅ подходящие навыки  
-❌ чего не хватает  
-💡 советы как улучшить резюме  
 
-Команда поиска вакансий:
+async def handle_menu(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-/jobs Product Manager
-"""
+    text = update.message.text
 
-    await update.message.reply_text(text)
+    if text == "📄 Отправить резюме":
+
+        await update.message.reply_text(
+            "Отправь PDF файл резюме."
+        )
+
+    elif text == "💼 Анализ вакансии":
+
+        await update.message.reply_text(
+            "Сначала отправь резюме."
+        )
+
+    elif text == "ℹ️ Помощь":
+
+        await help_command(update, context)
 
 
 async def handle_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    global resume_text
+    file = await update.message.document.get_file()
 
-    try:
+    path = f"{update.message.from_user.id}.pdf"
 
-        file = await update.message.document.get_file()
+    await file.download_to_drive(path)
 
-        await file.download_to_drive("resume.pdf")
+    text = extract_text(path)
 
-        resume_text = read_pdf("resume.pdf")
+    resume_storage[update.message.from_user.id] = text
 
-        await update.message.reply_text("✅ Резюме загружено")
-
-    except:
-
-        await update.message.reply_text("❌ Ошибка чтения PDF")
+    await update.message.reply_text(
+        "Резюме получено ✅\n\nТеперь отправь текст вакансии."
+    )
 
 
-async def handle_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    global resume_text
+    user_id = update.message.from_user.id
 
-    try:
+    if user_id not in resume_storage:
 
-        url = update.message.text
+        await update.message.reply_text(
+            "Сначала отправь резюме."
+        )
+        return
 
-        if "hh.ru" not in url:
+    vacancy = update.message.text
+    resume = resume_storage[user_id]
 
-            await update.message.reply_text("Отправь ссылку на вакансию hh.ru")
+    await update.message.reply_text("Анализирую...")
 
-            return
+    result = analyze(resume, vacancy)
 
-        if not resume_text:
-
-            await update.message.reply_text("Сначала отправь резюме PDF")
-
-            return
-
-        await update.message.reply_text("🔎 Анализирую вакансию...")
-
-        vacancy = parse_hh(url)
-
-        result = analyze(resume_text, vacancy)
-
-        if len(result) > 4000:
-            result = result[:4000]
-
-        await update.message.reply_text(result)
-
-    except Exception as e:
-
-        logging.error(e)
-
-        await update.message.reply_text("❌ Ошибка анализа")
-
-
-async def jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
-
-    try:
-
-        query = " ".join(context.args)
-
-        if not query:
-
-            await update.message.reply_text(
-                "Пример:\n/jobs Product Manager"
-            )
-            return
-
-        await update.message.reply_text("🔎 Ищу вакансии...")
-
-        links = search_jobs(query)
-
-        text = "🔥 Найденные вакансии:\n\n"
-
-        for l in links[:10]:
-            text += l + "\n"
-
-        await update.message.reply_text(text)
-
-    except:
-
-        await update.message.reply_text("❌ Ошибка поиска")
+    await update.message.reply_text(result)
 
 
 def main():
 
-    token = os.getenv("BOT_TOKEN")
-
-    if not token:
-        raise ValueError("BOT_TOKEN not set")
-
-    app = ApplicationBuilder().token(token).build()
+    app = ApplicationBuilder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("jobs", jobs))
 
-    app.add_handler(MessageHandler(filters.Document.PDF, handle_pdf))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_link))
+    app.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_menu)
+    )
 
-    print("🚀 BOT STARTED")
+    app.add_handler(
+        MessageHandler(filters.Document.PDF, handle_pdf)
+    )
+
+    app.add_handler(
+        MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text)
+    )
+
+    print("Bot started")
 
     app.run_polling()
 
