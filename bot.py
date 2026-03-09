@@ -1,3 +1,4 @@
+```python
 import logging
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
@@ -29,10 +30,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await update.message.reply_text(
         "👋 Привет!\n\n"
-        "1️⃣ Отправь текст или PDF резюме\n"
+        "1️⃣ Отправь резюме\n"
         "2️⃣ Затем отправь вакансию\n\n"
         "Я сделаю ATS анализ."
     )
+
+
+async def progress_bar(message):
+
+    progress_steps = [10, 25, 50, 75, 90]
+
+    for p in progress_steps:
+        await asyncio.sleep(2)
+        try:
+            await message.edit_text(f"🔎 Анализирую...\n\n{p}%")
+        except:
+            pass
 
 
 async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -53,9 +66,11 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
     vacancy = parse_vacancy(text)[:1500]
     resume = resume_storage[user]
 
-    msg = await update.message.reply_text("⚡ Анализирую...")
+    msg = await update.message.reply_text("🔎 Анализирую...\n\n0%")
 
     loop = asyncio.get_event_loop()
+
+    progress_task = asyncio.create_task(progress_bar(msg))
 
     try:
 
@@ -66,8 +81,10 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
             vacancy
         )
 
+        progress_task.cancel()
+
         await msg.edit_text(
-            "📊 Результат анализа:\n\n" + result
+            "✅ Анализ готов\n\n" + result
         )
 
     except Exception as e:
@@ -75,7 +92,7 @@ async def handle_text(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logging.error(e)
 
         await msg.edit_text(
-            "❌ Ошибка анализа. Попробуй ещё раз."
+            "❌ Ошибка анализа"
         )
 
 
@@ -96,3 +113,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+```
