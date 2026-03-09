@@ -1,15 +1,41 @@
+import os
 from openai import OpenAI
-from prompts import build_prompt
 
-client = OpenAI()
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 
 def analyze(resume, vacancy):
 
-    prompt = build_prompt(resume, vacancy)
+    prompt = f"""
 
-    completion = client.chat.completions.create(
-        model="gpt-4.1-mini",
-        messages=[{"role": "user", "content": prompt}]
+You are an ATS system.
+
+Resume:
+{resume}
+
+Vacancy:
+{vacancy}
+
+Return:
+
+1 ATS SCORE (0-100)
+
+2 Missing keywords
+
+3 What to ADD to resume (do not rewrite resume)
+
+4 Short cover letter
+
+"""
+
+    response = client.chat.completions.create(
+
+        model="gpt-4o-mini",
+
+        messages=[
+            {"role": "user", "content": prompt}
+        ]
+
     )
 
-    return completion.choices[0].message.content
+    return response.choices[0].message.content
