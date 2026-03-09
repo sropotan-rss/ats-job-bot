@@ -34,8 +34,8 @@ ATS ОЦЕНКА (0-100)
 """
 
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": prompt}]
+            model="gpt-4o-mini"
+max_tokens=500
         )
 
         return response.choices[0].message.content
