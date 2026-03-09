@@ -9,20 +9,19 @@ client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 MODEL = "llama3-8b-8192"
 
 
-def analyze(resume: str, vacancy: str) -> str:
+def analyze_resume_vacancy(resume, vacancy):
 
-    # Ограничиваем текст чтобы ускорить AI
-    resume = resume[:2000]
-    vacancy = vacancy[:2000]
+    resume = resume[:1500]
+    vacancy = vacancy[:1500]
 
     prompt = f"""
 Ты HR эксперт.
 
-Сравни резюме и вакансию.
+Оцени насколько кандидат подходит под вакансию.
 
-Ответь коротко:
+Ответь кратко:
 
-ATS ОЦЕНКА (0-100)
+ATS SCORE (0-100)
 
 СИЛЬНЫЕ СТОРОНЫ
 - ...
@@ -41,7 +40,7 @@ ATS ОЦЕНКА (0-100)
         model=MODEL,
         messages=[{"role": "user", "content": prompt}],
         temperature=0.2,
-        max_tokens=400
+        max_tokens=300
     )
 
     return completion.choices[0].message.content
