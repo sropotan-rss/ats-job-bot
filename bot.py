@@ -4,10 +4,10 @@ import logging
 from telegram import Update
 from telegram.ext import (
     ApplicationBuilder,
-    MessageHandler,
     CommandHandler,
+    MessageHandler,
     ContextTypes,
-    filters,
+    filters
 )
 
 from parser import parse_hh
@@ -16,23 +16,32 @@ from resume_reader import read_pdf
 from hh_search import search_jobs
 
 
-logging.basicConfig(
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    level=logging.INFO,
-)
+logging.basicConfig(level=logging.INFO)
 
 resume_text = ""
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
-    text = (
-        "🤖 ATS Job Bot\n\n"
-        "1️⃣ Send PDF resume\n"
-        "2️⃣ Send hh.ru vacancy link\n"
-        "3️⃣ Command:\n"
-        "/jobs Product Manager"
-    )
+    text = """
+🤖 AI Бот анализа резюме
+
+Что я умею:
+
+1️⃣ Отправь PDF резюме  
+2️⃣ Отправь ссылку на вакансию hh.ru  
+
+Я покажу:
+
+📊 ATS оценку  
+✅ подходящие навыки  
+❌ чего не хватает  
+💡 советы как улучшить резюме  
+
+Команда поиска вакансий:
+
+/jobs Product Manager
+"""
 
     await update.message.reply_text(text)
 
@@ -45,19 +54,15 @@ async def handle_pdf(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         file = await update.message.document.get_file()
 
-        path = "resume.pdf"
+        await file.download_to_drive("resume.pdf")
 
-        await file.download_to_drive(path)
+        resume_text = read_pdf("resume.pdf")
 
-        resume_text = read_pdf(path)
+        await update.message.reply_text("✅ Резюме загружено")
 
-        await update.message.reply_text("✅ Resume uploaded")
+    except:
 
-    except Exception as e:
-
-        logging.error(e)
-
-        await update.message.reply_text("❌ Error reading PDF")
+        await update.message.reply_text("❌ Ошибка чтения PDF")
 
 
 async def handle_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -70,17 +75,17 @@ async def handle_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if "hh.ru" not in url:
 
-            await update.message.reply_text("Send hh.ru vacancy link")
+            await update.message.reply_text("Отправь ссылку на вакансию hh.ru")
 
             return
 
         if not resume_text:
 
-            await update.message.reply_text("⚠ Upload resume first")
+            await update.message.reply_text("Сначала отправь резюме PDF")
 
             return
 
-        await update.message.reply_text("🔎 Analyzing vacancy...")
+        await update.message.reply_text("🔎 Анализирую вакансию...")
 
         vacancy = parse_hh(url)
 
@@ -95,7 +100,7 @@ async def handle_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         logging.error(e)
 
-        await update.message.reply_text("❌ Error analyzing vacancy")
+        await update.message.reply_text("❌ Ошибка анализа")
 
 
 async def jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -107,32 +112,24 @@ async def jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if not query:
 
             await update.message.reply_text(
-                "Example:\n/jobs Product Manager"
+                "Пример:\n/jobs Product Manager"
             )
             return
 
-        await update.message.reply_text("🔎 Searching jobs...")
+        await update.message.reply_text("🔎 Ищу вакансии...")
 
         links = search_jobs(query)
 
-        if not links:
-
-            await update.message.reply_text("No jobs found")
-
-            return
-
-        text = "🔥 Top vacancies:\n\n"
+        text = "🔥 Найденные вакансии:\n\n"
 
         for l in links[:10]:
             text += l + "\n"
 
         await update.message.reply_text(text)
 
-    except Exception as e:
+    except:
 
-        logging.error(e)
-
-        await update.message.reply_text("❌ Error searching jobs")
+        await update.message.reply_text("❌ Ошибка поиска")
 
 
 def main():
@@ -140,7 +137,6 @@ def main():
     token = os.getenv("BOT_TOKEN")
 
     if not token:
-
         raise ValueError("BOT_TOKEN not set")
 
     app = ApplicationBuilder().token(token).build()
